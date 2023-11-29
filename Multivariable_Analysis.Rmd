@@ -1,0 +1,190 @@
+---
+title: "Multivariable Analysis of Pupil Abnormalities and Discharge Outcomes"
+author: Divya Veerapaneni MS4, Ong Lab
+input: Consolidated_Study_Cohort_Traits.xlsx - excel sheet with final patient data including demographic data, pupil metrics, incidence and frequency of abnormal pupil phenotypes 
+output:
+  html_document:
+    df_print: paged
+---
+
+# Multivariable Analysis of Pupil Abnormalities and Discharge Outcomes
+### y = Unfavorable Outcomes, Deceased, and Awake/alert
+### x = mean NPi, min NPi, NPI diff, size diff, stages incidence and burden
+### confounding variables = Age, Sex, Black race, TBI severity, GCS, blunt vs penetrating injury, Marshall CT score
+
+#### Preprocessing Data
+```{r}
+#import statements
+library(readxl)
+library(gtsummary)
+library(tidyverse)
+library(broom)
+library(flextable)
+library(gridExtra)
+library(logistf)
+
+#input file
+df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Consolidated_Study_Cohort_Traits.xlsx")
+
+#variables of interest in input file
+factor_variables = list("Unfavorable_Outcome", "Orientedx3", "Awake_Alert", "Deceased", "RACE_Black", "tbi_severity",
+    "Mechanism_Injury", "Marshall",
+     "stage1u_incidence", "stage2u_incidence", "stage3u_incidence", "stage1b_incidence", "stage2b_incidence", 
+     "uni_incidence", "bi_incidence", "any_incidence" )
+```
+
+#### Multivariable Analysis when adjusting for Age, Black Race, TBI severity, Mechanism of Injury, and Marshall Scale On Full Cohort
+```{r}
+
+explanatory_vars <- c('average_npi', 'lower_npi', 'npi_diff', 'size_diff', 
+ 'any_incidence', 'poor_npi_incidence','npi_diff_incidence', 'size_diff_incidence',
+ 'uni_any_incidence', 'stage1u_incidence', 'stage2u_incidence', 'stage3u_incidence',
+       'bi_incidence', 'stage1b_incidence','stage2b_incidence', 'stage3b_incidence', 
+  'any_burden', 'poor_npi_burden', 'npi_diff_burden', 'size_diff_burden',
+ 'uni_any_burden','stage1u_burden', 'stage2u_burden', 'stage3u_burden', 
+        'bi_burden', 'stage1b_burden', 'stage2b_burden','stage3b_burden',
+ 'average_npi_0_removed', 'lower_npi_0_removed', 
+ 'stage4u_incidence', 'npi_diff_size_diff_incidence', 'size_diff_poor_npi_incidence', 
+ 'stage4u_burden',  'npi_diff_size_diff_burden','size_diff_poor_npi_burden')
+
+create_multivariable_table <- function(data_df, y, x_list){
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE_Black + tbi_severity + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate),2), ci_low = round(exp(conf.low),2), ci_high = round(exp(conf.high),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+UO_tb <- create_multivariable_table(df, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tb <- create_multivariable_table(df, "Deceased", explanatory_vars)
+Awake_tb <- create_multivariable_table(df, "Awake_Alert", explanatory_vars)
+#Oriented_tb <- create_multivariable_table(df, "Orientedx3", explanatory_vars)
+cbind(UO_tb, Deceased_tb, Awake_tb)
+
+#write.csv(dat_append, "/Users/divs/Downloads/Multivariate_Marshall_11-15.csv")
+
+#png("/Users/divs/Downloads/Multivariate_full_cohort.png", height = 25*nrow(dat_append), width = 150*ncol(dat_append))
+#grid.table(dat_append)
+#dev.off()
+
+```
+# Multivariable Analysis when adjusting for Age, Black Race, TBI severity, Mechanism of Injury, and Marshall Scale On Abnormal Patient Cohort (n=102)
+```{r}
+
+df_n102 <-  filter(df, any_incidence == 1)
+create_multivariable_table <- function(data_df, y, x_list){
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE_Black+tbi_severity + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate),2), ci_low = round(exp(conf.low),2), ci_high = round(exp(conf.high),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+
+UO_tb <- create_multivariable_table(df_n102, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tb <- create_multivariable_table(df_n102, "Deceased", explanatory_vars)
+Awake_tb <- create_multivariable_table(df_n102, "Awake_Alert", explanatory_vars)
+#Oriented_tb <- create_multivariable_table(df_n102, "Orientedx3", explanatory_vars)
+cbind(UO_tb, Deceased_tb, Awake_tb)
+
+#write.csv(dat_append_n102, "/Users/divs/Downloads/Multivariate_102_Marshall_11-15.csv")
+
+#png("/Users/divs/Downloads/Multivariate_full_cohort.png", height = 25*nrow(dat_append_n102), width = 150*ncol(dat_append_n102))
+#grid.table(dat_append_n102)
+#dev.off()
+
+```
+
+# Multivariable Firth For Incidence Where Less Than 10 Patients
+```{r}
+vars <-   list('stage2b_incidence', 'stage3b_incidence')
+
+outcomes <- list('Unfavorable_Outcome', 'Deceased', 'Awake_Alert')
+firth_final = data.frame()
+for (v in vars){
+  print(v)
+  row_final = data.frame(v) # create dataframe for row
+  for (outcome in outcomes){
+   
+    mod <- logistf(formula(paste(outcome, "~", v, "+ AGE +RACE_Black + tbi_severity + Mechanism_Injury + Marshall")), data = df) #create model  
+    OR <- round(exp(mod$coefficients[2]),2) # get OR for 2nd term rounded to 2 decimal points
+    CI <- round(exp(confint(mod, paste0(v)))[2,],2) # get confidence interval for 2nd term
+    CI <- paste(CI[1], CI[2], sep='-') # format CI to ci.low-ci-high
+    p <- round(mod$prob[2],3) # get p value
+    temp <- data.frame(outcome,OR,CI, p) #row-wise data
+    row_final <- cbind(row_final,temp) # combine all outcome results for same v into single row
+  }
+  firth_final <- rbind(firth_final, row_final) # add row by row as v changes
+}
+firth_final[ -c(1) ] # remove dummy first row
+# write.csv(firth_final, "/Users/divs/Downloads/Firth_Multivariable_Nonzero_Burden.csv")
+```
+
+# Multivariable Firth For All Burden Where Less Than 10 Patients
+```{r}
+vars <-   list('stage2b_burden','stage3b_burden')
+
+outcomes <- list('Unfavorable_Outcome', 'Deceased', 'Awake_Alert')
+
+v <- "stage2b_burden"
+outcome <- "Unfavorable_Outcome"
+
+if (v == 'stage2b_burden' ){#| v == 'stage3b_burden'){  
+      mod <- logistf(formula(paste(outcome, "~", v, "+ AGE +RACE_Black + Mechanism_Injury  + Marshall")), data = df) #create modelprint(v)
+    }else{
+      mod <- logistf(formula(paste(outcome, "~", v, "+ AGE +RACE_Black + tbi_severity + Mechanism_Injury + Marshall")), data = df) #create model  
+      print(v)
+    }
+    
+    OR <- round(exp(mod$coefficients[2]),2) # get OR for 2nd term rounded to 2 decimal points
+    CI <- round(exp(confint(mod, paste0(v)))[2,],2) # get confidence interval for 2nd term
+    CI <- paste(CI[1], CI[2], sep='-') # format CI to ci.low-ci-high
+    p <- round(mod$prob[2],3) # get p value
+    data.frame(outcome,OR,CI, p) #row-wise data
+```
+
+# Moderate TBI Multivariable Subanalysis
+```{r}
+
+create_multivariable_table2 <- function(data_df, y, x_list, formula){
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  formula)), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate),2), ci_low = round(exp(conf.low),2), ci_high = round(exp(conf.high),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+#create results for mod TBI patients
+modTBI_df <- filter(df, tbi_severity == "Moderate")
+
+UO_tbi_mod <- create_multivariable_table2(modTBI_df, "Unfavorable_Outcome", explanatory_vars,"+ AGE + RACE_Black + Mechanism_Injury + Marshall" )  
+Deceased_tbi_mod <- create_multivariable_table2(modTBI_df, "Deceased", explanatory_vars, "+ AGE + RACE_Black  + Marshall" )
+Awake_tbi_mod <- create_multivariable_table2(modTBI_df, "Awake_Alert", explanatory_vars, "+ AGE + RACE_Black  + Marshall")
+cbind(UO_tbi_mod, Deceased_tbi_mod, Awake_tbi_mod)
+#write.csv(dat_append_mod, "/Users/divs/Downloads/Multivariable_TBI_Marshall_11-15.csv")
+```
+
+# Severe TBI Multivariable Subanalysis
+```{r}
+#create results for severe TBI patients
+severeTBI_df <- filter(df, tbi_severity == "Severe")
+
+UO_tbi_severe <- create_multivariable_table2(severeTBI_df, "Unfavorable_Outcome", explanatory_vars,"+ AGE + RACE_Black + Mechanism_Injury + Marshall" )  
+Deceased_tbi_severe <- create_multivariable_table2(severeTBI_df, "Deceased", explanatory_vars, "+ AGE + RACE_Black + Mechanism_Injury + Marshall" )
+Awake_tbi_severe <- create_multivariable_table2(severeTBI_df, "Awake_Alert", explanatory_vars, "+ AGE + RACE_Black + Mechanism_Injury + Marshall")
+cbind(UO_tbi_severe, Deceased_tbi_severe, Awake_tbi_severe)
+#write.csv(dat_append_severe, "/Users/divs/Downloads/Multivariable_severeTBI_Marshall_11-15.csv")
+```
+
+
+
+
