@@ -1,5 +1,7 @@
 # TBI_Pupillometry
 
+This repository contains code for the scientific manuscript - "Frequency of abnormal pupil phenotypes within first 72 hours predictive of outcome in traumatic brain injury" by the Ong Lab led by Dr. Charlene Ong, MD, MPHS, at the Department of Neurology at Boston Medical Center and Boston University Chobanian & Avedisian School of Medicine. All code was done using Python v3.9.13 and R v4.2.0
+
 Python 
 - Preprocessing Datasets
   1. Dataset_Generation.ipynb
