@@ -15,6 +15,6 @@ Python
  
 R
 - Analysis
-  1. Univariate Analysis.Rmd
-  2. Multivariable Analysis.Rmd
+  1. Univariate Logistic and Linear Regression Analysis.Rmd
+  2. Multivariable Logistic Regression Analysis.Rmd
   3. Cox Model.Rmd
