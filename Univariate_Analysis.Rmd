@@ -1,0 +1,167 @@
+---
+title: "Univariate Analysis"
+author: Divya Veerapaneni MS4, Ong Lab
+input: Consolidated_Study_Cohort_Traits.xlsx - excel sheet with full TBI cohort details including demographic data, pupil metrics, incidence and frequency of abnormal pupil phenotypes 
+output: 
+  html_document:
+    df_print: paged
+---
+#### Input file: logistic_regression_data_137_final.xlsx 
+Excel sheet with preprocessed data for final 137 TBI patients including demographic data, pupil metrics, incidence and burden of abn pupil phenotypes 
+
+```{r}
+#import statements
+library(readxl)
+library(gtsummary)
+library(broom)
+library(lmtest)
+library(tidyverse)
+library(purrr)
+
+#input dataframe
+df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Consolidated_Study_Cohort_Traits.xlsx")
+
+#variables of interest in input file
+factor_variables = list("Unfavorable_Outcome", "Awake_Alert", "Deceased", "RACE_Black", "tbi_severity",
+    "Mechanism_Injury", "Marshall", "Rotterdam",
+     'any_incidence', 'poor_npi_incidence', 'npi_diff_incidence',
+       'size_diff_incidence', 'uni_any_incidence', 'stage1u_incidence',
+       'stage2u_incidence', 'stage3u_incidence', 'stage4u_incidence',
+       'bi_incidence', 'stage1b_incidence', 'stage2b_incidence',
+       'stage3b_incidence' )
+#dft$RACE <- relevel(df$RACE, ref="White")
+df$RACE <- as.factor(df$RACE) %>%
+relevel("White")
+
+colnames(df)
+```
+
+# Effect of Possible Risk Factors on Any Frequency
+Includes beta coefficient, 95%Cl, and p values
+```{r}
+explanatory_vars <- c("AGE", "SEX", "RACE_Black", "RACE", "tbi_severity", "GCS","Mechanism_Injury", "Bolt", "EVD", "Crani_Surgery", "Marshall", "Rotterdam", "Time_to_most_severe_CT", "time_to_first_obs", "lower_npi","average_npi", "npi_diff", "size_diff", "time_to_first_obs")
+
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, any_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalized linear model)
+    y = any_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+# Effect of Risk Factors on Unilateral Pupil Abnormalities
+Includes beta coefficient, 95%Cl, and p values
+```{r}
+
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, uni_any_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalized linear model)
+    y = uni_any_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+# Effect of Risk Factors on Bilateral Pupil Abnormalitie
+Includes beta coefficient, 95%Cl, and p values
+```{r}
+
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, bi_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = bi_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+# Stages Burden Univariate Analysis
+
+```{r}
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, stage1u_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = stage1u_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+```{r}
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, stage2u_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = stage2u_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+```{r}
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, stage3u_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = stage3u_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+```{r}
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, stage1b_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = stage1b_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+```{r}
+univ_tab <- df %>% 
+  dplyr::select(explanatory_vars, stage2b_burden) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = lm,                           ## define regression want to run (generalised linear model)
+    y = stage2b_burden,                            ## define outcome variable
+  )
+univ_tab
+```
+
+# Logistic Regression Univariate Analysis for Any Incidence vs Age, Sex, Race, and TBI Severity
+Includes OR, 95%Cl, and p values
+```{r}
+
+models <- explanatory_vars %>%       # begin with variables of interest
+  str_c("any_incidence ~ ", .) %>%  # combine each variable into formula
+  
+  # iterate through each univariate formula
+  map(                               
+    .f = ~glm(                       # pass the formulas one-by-one to glm()
+      formula = as.formula(.x),      # within glm(), the string formula is .x
+      family = "binomial",           # specify type of glm (logistic)
+      data = df)) %>%          # dataset
+  
+  # tidy up each of the glm regression outputs from above
+  map(
+    .f = ~tidy(
+      .x, 
+      exponentiate = TRUE,           # exponentiate 
+      conf.int = TRUE)) %>%          # return confidence intervals
+  
+  # collapse the list of regression outputs in to one data frame
+  bind_rows() %>% 
+  
+  # round all numeric columns
+  mutate(across(where(is.numeric), round, digits = 2))
+models
+```
+
