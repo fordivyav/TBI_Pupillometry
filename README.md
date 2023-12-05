@@ -18,6 +18,6 @@ _Python_
 _R_
 
   **Analysis**
-  1. Univariate Logistic and Linear Regression Analysis.Rmd
-  2. Multivariable Logistic Regression Analysis.Rmd
-  3. Cox Multivariable Regression Analysis.Rmd
+  1. Univariate Analysis.Rmd
+  2. Multivariable Analysis.Rmd
+  3. Cox Regression.Rmd
