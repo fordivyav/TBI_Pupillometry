@@ -269,3 +269,11 @@ def clean_discharge_disposition(df):
                                 'Hospice/Home': 'Hospice'}
   df = df.replace({"DISCH_DISP_NM":discharge_disposition_dict})
   return df
+
+#get number of patients and observations for phenotype
+def get_N_and_M(input_df, phenotype_label):
+    sub_df = input_df[input_df[phenotype_label] == 1]
+    n = len(sub_df.mrn.unique())
+    m = len(sub_df)
+    print(phenotype_label.capitalize() + ': n=' + str(n) + ', M='+str(m))
+    return
