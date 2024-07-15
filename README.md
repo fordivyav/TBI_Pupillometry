@@ -6,9 +6,8 @@ _Python_
 
   **Preprocessing Datasets**
   1. Dataset_Generation.ipynb
-  2. Preprocess_Cox_Dataset.ipynb
-  3. HelperMethods.py
-  4. Discharge Summary Extraction.ipynb
+  2. HelperMethods.py
+  3. Discharge Summary Extraction.ipynb
      
   **Figures/Tables**
   1. Demographic_Table.ipynb
@@ -16,8 +15,11 @@ _Python_
   3. Spaghetti_Plots.ipynb
  
 _R_
+ **Figures/Tables**
+ 1. Violin_Plots.Rmd
 
   **Analysis**
   1. Univariate Analysis.Rmd
   2. Multivariable Analysis.Rmd
-  3. Cox Regression.Rmd
+  3. IMPACT_Score2.Rmd
+  4. Statistical_Tests.Rmd
