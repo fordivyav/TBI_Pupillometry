@@ -1,0 +1,224 @@
+---
+title: "IMPACT Model 2.0"
+author: Divya Veerapaneni MS4, Ong Lab
+input: IMPACT Dataset 
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+#import libraries
+library(lmtest)
+library(readxl)
+library(gtsummary)
+library(pROC)
+library(PRROC)
+library(caret)
+library(popbio)
+impact_df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Intermediate Datasets/Impact_Dataset_2.xlsx")
+
+impact_df$reactive_pupils <- as.factor(impact_df$reactive_pupils) %>%
+relevel("2")
+str(impact_df)
+```
+# Preprocessing: Normalizing Input Parameters
+```{r}
+columns_to_normalize <- c('AGE', 'GCS_m', 'any_burden')
+data_to_normalize <- impact_df[, columns_to_normalize]
+
+# Normalize the columns
+normalized_data <- scale(data_to_normalize)
+
+# Replace the original columns with the normalized ones
+impact_df[, columns_to_normalize] <- normalized_data
+```
+
+## 1) Core IMPACT Model 
+### 3 factors - age, GCS motor component, reactive pupils
+### Updated Model with new weights trained on our dataset
+```{r}
+
+#create IMPACT logistic regression model 
+IMPACT_model <- glm(Unfavorable_Outcome ~ + AGE + GCS_m + reactive_pupils, data=impact_df, family=binomial) 
+summary(IMPACT_model)
+
+#create IMPACT model + frequency
+Freq_model <- glm(Unfavorable_Outcome ~ + AGE + GCS_m + reactive_pupils + any_burden, data=impact_df, family=binomial) 
+summary(Freq_model)
+
+#compute LRT
+lrtest(IMPACT_model, Freq_model) #SIGNIFICANT p=0.02
+
+library(sjPlot)
+library(sjlabelled)
+library(sjmisc)
+barplot(coef(Freq_model), col = "skyblue", main = "Model Coefficients")
+plot_model(IMPACT_model, show.values = TRUE, sort.est = TRUE, auto.label = FALSE, title ='Unfavorable Discharge Disposition', axis.title = c("Odds Ratio", "Model Factors")) + 
+  scale_x_discrete(labels=list(
+    reactive_pupils0 = "Pupil Reactivity=0",
+    reactive_pupils1 = "Pupil Reactivity=1",
+    AGE = "Age (years)",
+    GCS_m = "GCS Motor"
+  ))
+plot_model(Freq_model, show.values = TRUE, sort.est = TRUE, auto.label = FALSE, title ='Unfavorable Discharge Disposition', axis.title = c("Odds Ratio", "Model Factors")) + 
+  scale_x_discrete(labels=list(
+    reactive_pupils0 = "Pupil Reactivity=0",
+    reactive_pupils1 = "Pupil Reactivity=1",
+    any_burden = "Pupil Frequency",
+    AGE = "Age (years)",
+    GCS_m = "GCS Motor"
+  ))
+```
+
+
+# ROC Curve Plot with AUC
+```{r}
+# create ROC curve for IMPACT Model vs IMPACT Model + Burden
+predict(IMPACT_model, type = "response") -> IMPACT_predictions
+predict(Freq_model, type = "response") -> IMPACTFrequency_predictions
+roc_curve <- roc(impact_df$Unfavorable_Outcome, IMPACT_predictions)
+roc_curve2 <- roc(impact_df$Unfavorable_Outcome, IMPACTFrequency_predictions)
+
+par(pty = "s", mar = c(4, 2, 2, 2) + 0.1) #formatting of graph spacing
+
+# Create an empty plot without the diagonal line
+plot(NA, NA, type = "n", xlim = c(1,0), ylim = c(0, 1), 
+     xlab = "False Positive Rate", ylab = "True Positive Rate", main = "ROC Curve: Unfavorable Discharge Disposition", xaxt="n")
+
+# Plot the ROC curves
+plot.roc(roc_curve, col = "blue",add=TRUE, legacy.axes =TRUE) #print.auc=TRUE, print_auc.coords=c(0.5,0.5)
+plot.roc(roc_curve2, col = "red", add = TRUE)
+
+# Add legend
+legend("bottomright", legend = c("IMPACT, AUC=0.75", "IMPACT + Frequency, AUC=0.78"), col = c("blue", "red"), lwd=3, text.font = 1, cex=0.8)
+
+axis(side = 1, at = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0), labels = c("1.0", "0.8", "0.6", "0.4", "0.2", "0.0"))
+
+# Perform DeLong's test
+delong_test <- roc.test(roc_curve, roc_curve2, method = "delong")
+
+# Print the result
+print(delong_test)
+
+ci.auc(impact_df$Unfavorable_Outcome, IMPACT_predictions) 
+ci.auc(impact_df$Unfavorable_Outcome, IMPACTFrequency_predictions) 
+```
+# Predicting Mortality
+```{r}
+
+#create IMPACT logistic regression model 
+IMPACT_model <- glm(Deceased ~ AGE + GCS_m + reactive_pupils, data=impact_df, family=binomial) 
+summary(IMPACT_model)
+
+#create IMPACT model + frequency
+Freq_model <- glm(Deceased ~  AGE + GCS_m + reactive_pupils + any_burden, data=impact_df, family=binomial) 
+summary(Freq_model)
+
+#compute LRT
+lrtest(IMPACT_model, Freq_model) #SIGNIFICANT p=0.02
+
+plot_model(Freq_model, show.values = TRUE, sort.est = TRUE, auto.label = FALSE, title ='Death at Discharge', axis.title = c("Odds Ratio", "Model Factors")) + 
+  scale_x_discrete(labels=list(
+    reactive_pupils0 = "Pupil Reactivity=0",
+    reactive_pupils1 = "Pupil Reactivity=1",
+    any_burden = "Pupil Frequency",
+    AGE = "Age (years)",
+    GCS_m = "GCS Motor"
+  ))
+```
+# ROC Curve Plot with AUC
+```{r}
+# create ROC curve for IMPACT Model vs IMPACT Model + Burden
+predict(IMPACT_model, type = "response") -> IMPACT_predictions
+predict(Freq_model, type = "response") -> IMPACTFrequency_predictions
+roc_curve <- roc(impact_df$Deceased, IMPACT_predictions)
+roc_curve2 <- roc(impact_df$Deceased, IMPACTFrequency_predictions)
+
+par(pty = "s", mar = c(4, 2, 2, 2) + 0.1) #formatting of graph spacing
+
+# Create an empty plot without the diagonal line
+plot(NA, NA, type = "n", xlim = c(1,0), ylim = c(0, 1), 
+     xlab = "False Positive Rate", ylab = "True Positive Rate", main = "ROC Curve: Death at Discharge", xaxt="n")
+
+# Plot the ROC curves
+plot.roc(roc_curve, col = "blue",add=TRUE, legacy.axes =TRUE) #print.auc=TRUE, print_auc.coords=c(0.5,0.5)
+plot.roc(roc_curve2, col = "red", add = TRUE)
+
+# Add legend
+legend("bottomright", legend = c("IMPACT, AUC=0.81", "IMPACT + Frequency, AUC=0.89"), col = c("blue", "red"), lwd=3, text.font = 1, cex=0.8)
+
+axis(side = 1, at = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0), labels = c("1.0", "0.8", "0.6", "0.4", "0.2", "0.0"))
+
+# Perform DeLong's test
+delong_test <- roc.test(roc_curve, roc_curve2, method = "delong")
+
+# Print the result
+print(delong_test)
+
+ci.auc(impact_df$Deceased, IMPACT_predictions) 
+ci.auc(impact_df$Deceased, IMPACTFrequency_predictions) 
+```
+
+
+
+# Performance Metrics
+```{r}
+# Function to calculate performance metrics
+calculate_performance <- function(predictions) {
+  # Convert predicted probabilities to binary labels
+  impact_df$pred_glm = as.factor(ifelse(predictions > 0.5, 1, 0))
+  
+  # Confusion matrix
+  CM <- confusionMatrix(data = impact_df$pred_glm, reference = as.factor(impact_df$Unfavorable_Outcome), positive = '1')
+  print(CM)
+  return(CM)
+}
+
+# Calculate performance metrics for model A
+print('IMPACT Model Performance')
+impact_cm <- calculate_performance(IMPACT_predictions)
+
+# Calculate performance metrics for model B
+print('IMPACT Model + Frequency Performance')
+impact_freq_cm <- calculate_performance(IMPACTFrequency_predictions)
+```
+# 95%CI for Performance Metrics
+```{r}
+# Function to compute the confidence interval for sensitivity and specificity
+compute_confidence_interval <- function(conf_matrix) {
+  # Extract values from the confusion matrix
+  TP <- conf_matrix[2, 2]  # True Positives
+  TN <- conf_matrix[1, 1]  # True Negatives
+  FN <- conf_matrix[1, 2]  # False Positives
+  FP <- conf_matrix[2, 1]  # False Negatives
+  
+  # Compute sensitivity and specificity
+  sensitivity <- TP / (TP + FN)
+  specificity <- TN / (TN + FP)
+  ppv <- TP / (TP + FP)
+  npv <- TN / (TN + FN)
+  
+  # Compute standard errors
+  se_sensitivity <- sqrt(sensitivity * (1 - sensitivity) / (TP + FN))
+  se_specificity <- sqrt(specificity * (1 - specificity) / (TN + FP))
+  se_ppv <- sqrt(ppv * (1 - ppv) / (TP + FP))
+  se_npv <- sqrt(npv * (1 - npv) / (TN + FN))
+  
+  # Compute confidence intervals using the normal approximation method
+  ci_sensitivity <- c(sensitivity - 1.96 * se_sensitivity, sensitivity + 1.96 * se_sensitivity)
+  ci_specificity <- c(specificity - 1.96 * se_specificity, specificity + 1.96 * se_specificity)
+  ci_ppv <- c(ppv - 1.96 * se_ppv, ppv + 1.96 * se_ppv)
+  ci_npv <- c(npv - 1.96 * se_npv, npv + 1.96 * se_npv)
+  
+  return(list(sensitivity = sensitivity, specificity = specificity, ppv = ppv, npv = npv,
+              ci_sensitivity = ci_sensitivity, ci_specificity = ci_specificity,
+              ci_ppv = ci_ppv, ci_npv = ci_npv))
+}
+
+conf_matrix <- impact_cm$table
+
+# Compute confidence intervals for sensitivity and specificity
+result <- compute_confidence_interval(conf_matrix)
+print(result)
+```

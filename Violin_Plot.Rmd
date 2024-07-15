@@ -1,0 +1,84 @@
+---
+title: "Violin Plots of Abnormal Pupil Phenotypes"
+author: Divya Veerapaneni MS4, Ong Lab
+input: Consolidated_Study_Cohort_Traits.xlsx - excel sheet with final patient data including demographic data, pupil metrics, incidence and frequency of abnormal pupil phenotypes 
+output:
+  html_document:
+    df_print: paged
+---
+
+# Violin Plots
+```{r}
+#import statements
+library(readxl)
+library(gtsummary)
+library(tidyverse)
+library(broom)
+library(ggplot2)
+
+#input file
+df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Consolidated_Study_Cohort_Traits.xlsx")
+
+#variables of interest in input file
+factor_variables = list("Unfavorable_Outcome", "Awake_Alert", "Deceased", "RACE", "tbi_severity",
+    "Mechanism_Injury", "Marshall",
+     "stage1u_incidence", "stage2u_incidence", "stage3u_incidence", "stage1b_incidence", "stage2b_incidence", 
+     "uni_incidence", "bi_incidence", "any_incidence" )
+df$RACE <- as.factor(df$RACE) %>%
+relevel("White")
+df$Unfavorable_Outcome <- as.factor(df$Unfavorable_Outcome)
+df["any_burden"][df["any_burden"] == 0] <- NA
+df["uni_any_burden"][df["uni_any_burden"] == 0] <- NA
+df["bi_burden"][df["bi_burden"] == 0] <- NA
+str(df)
+```
+#### Abnormal Pupil Phenotypes by TBI Severity
+```{r}
+options(repr.plot.width = 5, repr.plot.height =2)
+tbi_p <- ggplot(df, aes(x = tbi_severity, y = any_burden, color=tbi_severity)) + geom_violin() 
+p <- ggplot(df, aes(x = '', y = any_burden, color="purple")) + geom_violin(color="purple") 
+tbi_p + geom_boxplot(width=0.1) + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) + theme(axis.text=element_text(size=12))
+# + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+p + geom_boxplot(width=0.1, color='purple') + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) + theme(axis.text=element_text(size=12))
+```
+
+#### Unilateral Pupil Phenotypes
+```{r}
+tbi_p <- ggplot(df, aes(x = tbi_severity, y = uni_any_burden, color=tbi_severity)) + geom_violin() 
+p <- ggplot(df, aes(x = '', y = uni_any_burden, color="purple")) + geom_violin(color="purple") 
+tbi_p + geom_boxplot(width=0.1)  + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) + theme(axis.text=element_text(size=12))
+# + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+p + geom_boxplot(width=0.1, color='purple') + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) + theme(axis.text=element_text(size=12))
+```                         
+                                                                                 
+#### Bilateral Pupil Phenotypes
+```{r}
+tbi_p <- ggplot(df, aes(x = tbi_severity, y = bi_burden, color=tbi_severity)) + geom_violin() 
+p <- ggplot(df, aes(x = '', y = bi_burden, color="purple")) + geom_violin(color="purple") 
+tbi_p + geom_boxplot(width=0.1) + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 8))
+# + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+p + geom_boxplot(width=0.1, color='purple') + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 8))
+```
+
+#### Abnormal Pupil Phenotypes by Unfavorable Outcome
+```{r}
+ggplot(df, aes(x = Unfavorable_Outcome, y = any_burden, color=Unfavorable_Outcome)) + geom_violin() + geom_boxplot(width=0.1) + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) + theme(axis.text=element_text(size=16)) +scale_color_manual(values=c("blue", "red"))
+#aspect_ratio <- 2.5
+#ggsave('Abn_Pupils_UO.png', height = 5 , width = 5 * aspect_ratio)
+```
+#### Unilateral Abnormal Pupil Phenotypes by Unfavorable Outcome
+```{r}
+ggplot(df, aes(x = Unfavorable_Outcome, y = uni_any_burden, color=Unfavorable_Outcome)) + geom_violin() + geom_boxplot(width=0.1) + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5))+ theme(axis.text=element_text(size=16)) +scale_color_manual(values=c("blue", "red"))
+aspect_ratio <- 2.5
+#ggsave('Uni_Abn_Pupils_UO.png', height = 5 , width = 5 * aspect_ratio)
+```
+
+#### Bilateral Abnormal Pupil Phenotypes by Unfavorable Outcome
+```{r}
+ggplot(df, aes(x = Unfavorable_Outcome, y = bi_burden, color=Unfavorable_Outcome)) + geom_violin() + geom_boxplot(width=0.1) + theme_classic()+scale_y_continuous(breaks = scales::pretty_breaks(n = 5)) +theme(axis.text=element_text(size=16)) +scale_color_manual(values=c("blue", "red"))
+aspect_ratio <- 2.5
+#ggsave('Bi_Abn_Pupils_UO.png', height = 5 , width = 5 * aspect_ratio)
+```
+
+
+
