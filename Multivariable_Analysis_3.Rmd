@@ -1,0 +1,154 @@
+---
+title: "Multivariable Analysis of Pupil Abnormalities and Discharge Outcomes"
+author: Divya Veerapaneni MS4, Ong Lab
+input: Consolidated_Study_Cohort_Traits.xlsx - excel sheet with final patient data including demographic data, pupil metrics, incidence and frequency of abnormal pupil phenotypes 
+output:
+  html_document:
+    df_print: paged
+---
+
+# Multivariable Analysis of Pupil Abnormalities and Discharge Outcomes
+### y = Unfavorable Outcomes, Deceased, and Awake/alert
+### x = mean NPi, min NPi, NPI diff, size diff, stages incidence and burden
+### confounding variables = Age, Sex, Black race, TBI severity, GCS, blunt vs penetrating injury, Marshall CT score
+
+#### Preprocessing Data
+```{r}
+#import statements
+library(readxl)
+library(gtsummary)
+library(tidyverse)
+library(broom)
+library(flextable)
+#library(gridExtra)
+library(logistf)
+
+#input file
+df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Consolidated_Study_Cohort_Traits.xlsx")
+
+#variables of interest in input file
+factor_variables = list("Unfavorable_Outcome", "Awake_Alert", "Deceased", "RACE", "tbi_severity",
+    "Mechanism_Injury", "Marshall",
+     "uni_incidence", "bi_incidence", "any_incidence" )
+df$RACE <- as.factor(df$RACE) %>%
+relevel("White")
+```
+
+```{r}
+# Use for Incidence
+create_multivariable_table_incidence <- function(data_df, y, x_list){
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE + tbi_severity + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate),2), ci_low = round(exp(conf.low),2), ci_high = round(exp(conf.high),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+
+# Use for Burden For 1% Increase
+create_multivariable_table_OR1 <- function(data_df, y, x_list){
+  percent_increase <- 1
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE + tbi_severity + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate*percent_increase),2), ci_low = round(exp(conf.low*percent_increase),2), ci_high = round(exp(conf.high*percent_increase),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+
+# Use for Incidence in Severe TBI
+create_multivariable_table_incidence_severe <- function(data_df, y, x_list){
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate),2), ci_low = round(exp(conf.low),2), ci_high = round(exp(conf.high),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+
+# Use for Burden in Severe TBI
+create_multivariable_table_OR1_severe <- function(data_df, y, x_list){
+  percent_increase <- 1
+  tb <- 
+map_df(explanatory_vars,
+       ~glm(formula(paste(y, "~", .x,  " + AGE +RACE + Mechanism_Injury + Marshall")), data = data_df, family = binomial) %>%
+         tidy(conf.int = TRUE)) %>%
+  filter(term %in% explanatory_vars) %>%
+  mutate(OR = round(exp(estimate*percent_increase),2), ci_low = round(exp(conf.low*percent_increase),2), ci_high = round(exp(conf.high*percent_increase),2), p_value = round(p.value,3), CI = paste(ci_low, ci_high, sep = "-")) %>%
+  select(term, OR, CI, p_value) %>%
+  rename(!! paste0(y) := term, OR=OR, CI=CI, p_value=p_value)
+  return (tb)
+}
+```
+
+
+#### Multivariable Analysis when adjusting for Age, Black Race, TBI severity, Mechanism of Injury, and Marshall Scale On Full Cohort by 3% Increase 
+```{r}
+
+explanatory_vars <- c(
+  'any_burden', 'poor_npi_burden', 'npi_diff_burden', 'size_diff_burden',
+ 'uni_any_burden','bi_burden')
+
+UO_tb <- create_multivariable_table_OR1(df, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tb <- create_multivariable_table_OR1(df, "Deceased", explanatory_vars)
+Awake_tb <- create_multivariable_table_OR1(df, "Awake_Alert", explanatory_vars)
+MV_Burden_OR1_Results <- cbind(UO_tb, Deceased_tb, Awake_tb)
+write.csv(MV_Burden_OR1_Results, "/Users/divs/Downloads/Multivariable_OR1_freq.csv")
+```
+
+#### Multivariable Analysis when adjusting for Age, Black Race, TBI severity, Mechanism of Injury, and Marshall Scale On Full Cohort for 1% Increase
+```{r}
+
+explanatory_vars <- c('average_npi', 'lower_npi', 'npi_diff', 'size_diff', 
+ 'any_incidence', 'poor_npi_incidence','npi_diff_incidence', 'size_diff_incidence',
+ 'uni_any_incidence', 'bi_incidence')
+
+UO_tb <- create_multivariable_table_incidence(df, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tb <- create_multivariable_table_incidence(df, "Deceased", explanatory_vars)
+Awake_tb <- create_multivariable_table_incidence(df, "Awake_Alert", explanatory_vars)
+MV_Incidence_OR1_Results <- cbind(UO_tb, Deceased_tb, Awake_tb)
+write.csv(MV_Burden_OR1_Results, "/Users/divs/Downloads/Multivariable_OR1_incidence.csv")
+```
+
+
+
+# Severe TBI Multivariable Subanalysis
+```{r}
+#create results for severe TBI patients
+severeTBI_df <- filter(df, tbi_severity == "Severe")
+
+
+#first compute analysis for incidence
+explanatory_vars <- c(
+  'average_npi', 'lower_npi', 'npi_diff', 'size_diff', 
+  'any_incidence','uni_any_incidence', 'bi_incidence')
+
+UO_tbi_severe <- create_multivariable_table_incidence_severe(severeTBI_df, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tbi_severe <- create_multivariable_table_incidence_severe(severeTBI_df, "Deceased", explanatory_vars)
+Awake_tbi_severe <- create_multivariable_table_incidence_severe(severeTBI_df, "Awake_Alert", explanatory_vars)
+MV_severe_incidence <- cbind(UO_tbi_severe, Deceased_tbi_severe, Awake_tbi_severe)
+write.csv(MV_severe_incidence, "/Users/divs/Downloads/MV_severe_incidence.csv")
+
+#then compute analysis for burden
+explanatory_vars <- c(
+  'any_burden','uni_any_burden', 'bi_burden')
+UO_tbi_severe <- create_multivariable_table_OR1_severe(severeTBI_df, "Unfavorable_Outcome", explanatory_vars)  
+Deceased_tbi_severe <- create_multivariable_table_OR1_severe(severeTBI_df, "Deceased", explanatory_vars)
+Awake_tbi_severe <- create_multivariable_table_OR1_severe(severeTBI_df, "Awake_Alert", explanatory_vars)
+MV_severe_burden <- cbind(UO_tbi_severe, Deceased_tbi_severe, Awake_tbi_severe)
+write.csv(MV_severe_burden, "/Users/divs/Downloads/Severe_OR1_Freq.csv")
+
+```
+
+
+
+
