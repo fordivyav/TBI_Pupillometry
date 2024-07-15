@@ -1,0 +1,111 @@
+---
+title: "Chi-Square Analysis of Categorical Variables and TBI Severity"
+author: Divya Veerapaneni MS4, Ong Lab
+input: Consolidated_Study_Cohort_Traits.xlsx - excel sheet with final patient data including demographic data, pupil metrics, incidence and frequency of abnormal pupil phenotypes 
+output:
+  html_document:
+    df_print: paged
+---
+
+#### Preprocessing Data
+```{r}
+#import statements
+library(readxl)
+library(gtsummary)
+library(tidyverse)
+library(broom)
+library(flextable)
+#library(gridExtra)
+library(logistf)
+
+#input file
+df <- read_excel("/Users/divs/Box/1-BMC Smartguards/10-Processing and Visualization/8-TBI Pupillometry/Data/Consolidated_Study_Cohort_Traits.xlsx")
+
+#variables of interest in input file
+factor_variables = list("Unfavorable_Outcome", "Awake_Alert", "Deceased", "RACE", "tbi_severity",
+    "Mechanism_Injury", "Marshall",
+     "uni_incidence", "bi_incidence", "any_incidence" )
+df$tbi_severity <- as.factor(df$tbi_severity)
+df$RACE <- as.factor(df$RACE) %>%
+relevel("White")
+str(df)
+```
+
+# Incidence: Any, Unilateral, and Bilateral Pupil Abnormalities
+## Print all Chi Square Values for Categorical Variables
+```{r}
+chisq.test(table(df$any_incidence, df$tbi_severity))$expected # < 5
+chisq.test(table(df$poor_npi_incidence, df$tbi_severity))$expected
+chisq.test(table(df$npi_diff_incidence, df$tbi_severity))$expected
+chisq.test(table(df$size_diff_incidence, df$tbi_severity))$expected
+chisq.test(table(df$uni_any_incidence, df$tbi_severity))$expected # < 5
+chisq.test(table(df$bi_incidence, df$tbi_severity))$expected # < 5
+```
+
+## Print all Fisher Tests if Expected Count < 5 for Chi Square
+```{r}
+fisher.test(df$any_incidence, df$tbi_severity)
+fisher.test(df$uni_any_incidence, df$tbi_severity)
+fisher.test(df$bi_incidence, df$tbi_severity)
+```
+
+# Categorical Variables: Sex, Race, Mechanism Injury, Bolt, EVD, Cranial Surgery, Discharge Disposition, Unfavorable Outcome, Death, Awake_Alert
+## Print all Chi Square Values for Categorical Variables
+```{r}
+chisq.test(table(df$SEX, df$tbi_severity))$expected
+chisq.test(table(df$RACE, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Mechanism_Injury, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Bolt, df$tbi_severity))$expected # < 5
+chisq.test(table(df$EVD, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Crani_Surgery, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Discharge_Disposition, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Unfavorable_Outcome, df$tbi_severity))$expected
+chisq.test(table(df$Deceased, df$tbi_severity))$expected # < 5
+chisq.test(table(df$Awake_Alert, df$tbi_severity))$expected # < 5
+```
+## Print all Fisher Tests if Expected Count < 5 for Chi Square (Race, Mechanism Injury, Bolt, EVD, Cranial Surgery, Discharge Disposition, Death, Awake_Alert)
+```{r}
+fisher.test(df$RACE, df$tbi_severity)
+fisher.test(df$Mechanism_Injury, df$tbi_severity)
+fisher.test(df$Bolt, df$tbi_severity)
+fisher.test(df$EVD, df$tbi_severity)
+fisher.test(df$Crani_Surgery, df$tbi_severity)
+fisher.test(df$Discharge_Disposition, df$tbi_severity, simulate.p.value = TRUE)
+fisher.test(df$Deceased, df$tbi_severity)
+fisher.test(df$Awake_Alert, df$tbi_severity)
+```
+## Frequency Kruskal-Wallis Test
+```{r}
+kruskal.test(any_burden ~ tbi_severity, data = df)
+kruskal.test(poor_npi_burden ~ tbi_severity, data = df)
+kruskal.test(npi_diff_burden ~ tbi_severity, data = df)
+kruskal.test(size_diff_burden ~ tbi_severity, data = df)
+kruskal.test(uni_any_burden ~ tbi_severity, data = df)
+```
+# Wilcoxon-Mann-Whitney test
+## Any Burden
+```{r}
+library(WMWssp)
+UO_df<- filter(df, Unfavorable_Outcome == 1)
+FO_df<- filter(df, Unfavorable_Outcome == 0)
+x1 <- FO_df$any_burden
+x2 <- UO_df$any_burden
+
+WMWssp(x1, x2, alpha = 0.05, power = 0.988, t = 85/131)
+```
+# Wilcoxon-Mann-Whitney test
+## Unilateral Burden
+```{r}
+x1 <- FO_df$uni_any_burden
+x2 <- UO_df$uni_any_burden
+WMWssp(x1, x2, alpha = 0.05, power = 0.67, t = 85/131)
+```
+# Wilcoxon-Mann-Whitney test
+## Bilateral Burden
+```{r}
+x1 <- FO_df$bi_burden
+x2 <- UO_df$bi_burden
+WMWssp(x1, x2, alpha = 0.05, power = 0.9945, t = 85/131)
+```
+
+
